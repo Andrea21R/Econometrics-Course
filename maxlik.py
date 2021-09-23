@@ -255,50 +255,50 @@ class MaxLik(object):
 
         return summary
 
-if __name__ == "__main__":
-    import numpy as np
-    from statsmodels.tsa.arima_process import ArmaProcess
-    from time import perf_counter
-
-    np.random.seed(12345)
-    ar2 = np.array([1, 0.5])
-    ma = np.array([1])
-    N = 20_000
-    sim = ArmaProcess(ar2, ma).generate_sample(nsample=N)
-
-    def logLikeAR_1(parameters, data):
-        c = parameters[0]
-        phi = parameters[1]
-        sigma_2 = parameters[2]
-        Lik = np.zeros(len(data))
-        Lik[0] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2 / (1 - phi ** 2)) - ((1 - phi ** 2) / 2 * sigma_2) * (
-                    data[0] - c / (1 - phi)) ** 2
-        for i in range(1, len(data)):
-            Lik[i] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2) - 0.5 * (
-                        data[i] - c - phi * data[i - 1]) ** 2 / sigma_2
-        return Lik
-
-    def avg_logLikeAR_1(parameters, data):
-        c = parameters[0]
-        phi = parameters[1]
-        sigma_2 = parameters[2]
-        Lik = np.zeros(len(data))
-        Lik[0] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2 / (1 - phi ** 2)) - ((1 - phi ** 2) / 2 * sigma_2) * (
-                    data[0] - c / (1 - phi)) ** 2
-        for i in range(1, len(data)):
-            Lik[i] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2) - 0.5 * (
-                        data[i] - c - phi * data[i - 1]) ** 2 / sigma_2
-        return -sum(Lik) / len(sim)
-
-    x0 = np.array([1, 0.4, 1])
-    bounds = [[-10, 10], [-0.999, 0.999], [0.001, 10]]
-
-    boss = MaxLik(
-        func_vector=logLikeAR_1,
-        func_avg=avg_logLikeAR_1,
-        data=sim,
-        initial_guess=x0,
-        bounds=bounds,
-        method_se_optimization='outer'
-    )
-    summary = boss.get_summary()
+# if __name__ == "__main__":
+#     import numpy as np
+#     from statsmodels.tsa.arima_process import ArmaProcess
+#     from time import perf_counter
+#
+#     np.random.seed(12345)
+#     ar2 = np.array([1, 0.5])
+#     ma = np.array([1])
+#     N = 20_000
+#     sim = ArmaProcess(ar2, ma).generate_sample(nsample=N)
+#
+#     def logLikeAR_1(parameters, data):
+#         c = parameters[0]
+#         phi = parameters[1]
+#         sigma_2 = parameters[2]
+#         Lik = np.zeros(len(data))
+#         Lik[0] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2 / (1 - phi ** 2)) - ((1 - phi ** 2) / 2 * sigma_2) * (
+#                     data[0] - c / (1 - phi)) ** 2
+#         for i in range(1, len(data)):
+#             Lik[i] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2) - 0.5 * (
+#                         data[i] - c - phi * data[i - 1]) ** 2 / sigma_2
+#         return Lik
+#
+#     def avg_logLikeAR_1(parameters, data):
+#         c = parameters[0]
+#         phi = parameters[1]
+#         sigma_2 = parameters[2]
+#         Lik = np.zeros(len(data))
+#         Lik[0] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2 / (1 - phi ** 2)) - ((1 - phi ** 2) / 2 * sigma_2) * (
+#                     data[0] - c / (1 - phi)) ** 2
+#         for i in range(1, len(data)):
+#             Lik[i] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2) - 0.5 * (
+#                         data[i] - c - phi * data[i - 1]) ** 2 / sigma_2
+#         return -sum(Lik) / len(sim)
+#
+#     x0 = np.array([1, 0.4, 1])
+#     bounds = [[-10, 10], [-0.999, 0.999], [0.001, 10]]
+#
+#     boss = MaxLik(
+#         func_vector=logLikeAR_1,
+#         func_avg=avg_logLikeAR_1,
+#         data=sim,
+#         initial_guess=x0,
+#         bounds=bounds,
+#         method_se_optimization='outer'
+#     )
+#     summary = boss.get_summary()
