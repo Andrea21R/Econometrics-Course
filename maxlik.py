@@ -1,7 +1,8 @@
 from typing import List
-
 import numpy as np
 import pandas as pd
+from time import perf_counter
+
 from scipy.optimize import minimize
 from scipy.stats import norm
 
@@ -9,10 +10,11 @@ from scipy.stats import norm
 class MaxLik(object):
 
     def __init__(self,
-                 func,
+                 func_vector,
+                 func_avg,
                  data: np.array,
                  initial_guess: np.array,
-                 bound: List[list],
+                 bounds: List[list],
                  delta_incremental: float = 0.00001,
                  method_se_optimization: str = None  # default: hessian_inv * inv(eye(hessian_inv.shape[0])
                  ):
@@ -20,10 +22,11 @@ class MaxLik(object):
         self.__check_num_pars(pars=initial_guess, data=data)
 
         # from input
-        self.func = func
+        self.func_vect = func_vector
+        self.func_avg = func_avg
         self.data: np.array = data
         self.initial_guess: np.array = initial_guess
-        self.bound: tuple = tuple(tuple(i) for i in bound)
+        self.bounds: tuple = tuple(tuple(i) for i in bounds)
         self.delta_incremental: float = delta_incremental
         self.method_se_optimization: str = method_se_optimization
 
@@ -40,13 +43,13 @@ class MaxLik(object):
         if len(pars) > len(data):
             raise ValueError("Number of parameters exceeds number of data. You cannot do it!!")
 
-    def __optimizator_boss(self):
+    def __optimizator_boss(self) -> None:
 
         res = minimize(
-            fun=self.func,
+            fun=self.func_avg,
             x0=self.initial_guess,
-            bounds=self.bound,
-            options={'gtol': 1e-6, 'disp': True}
+            bounds=self.bounds,
+            args=self.data
         )
         self.vfunc = res.fun
         self.pars_optimized = res.x
@@ -60,19 +63,27 @@ class MaxLik(object):
         pars: np.array = self.pars_optimized
 
         pos: np.array = np.identity(len(pars))
-        gradient: np.array = np.zeros(len(pars))
+        gradient: np.array = np.zeros([len(self.data), len(pars)])
 
         for i in range(len(pars)):
             if pars[i] > 1:
-                gradient[i] = (self.func(
-                    np.multiply(pars, (1 + h * pos[:, i]))) - self.func(pars)) / (pars[i] * h)
+                gradient[:, i] = (self.func_vect(
+                    np.multiply(
+                        pars,
+                        (1 + h * pos[:, i]),
+                        self.data
+                    )
+                ) - self.func_vect(pars, self.data)) / pars[i] * h
             else:
-                gradient[i] = (self.func(pars + h * pos[:, i]) - self.func(pars)) / h
+                gradient[:, i] = (self.func_vect(pars + h * pos[:, i], self.data) - self.func_vect(pars, self.data)) / h
 
         self.gradient = gradient
         return gradient
 
     def _calc_hessian(self) -> np.array:
+
+        if self.pars_optimized is None:
+            self.__optimizator_boss()
 
         pars = self.pars_optimized
         h = self.delta_incremental
@@ -84,25 +95,35 @@ class MaxLik(object):
             if pars[i] > 1:
                 x0P = np.multiply(pars, 1 + (h / 2) * pos[:, i])
                 x0N = np.multiply(pars, 1 - (h / 2) * pos[:, i])
+                delta_i = pars[i] * h
             else:
                 x0P = pars + (h / 2) * pos[:, i]
                 x0N = pars - (h / 2) * pos[:, i]
-            c = range(i + 1)
-            for j in c:
+                delta_i = h
+
+            for j in (0, i):
+
                 if pars[j] > 1:
                     x0PP = np.multiply(x0P, 1 + (h / 2) * pos[:, j])
                     x0PN = np.multiply(x0P, 1 - (h / 2) * pos[:, j])
                     x0NP = np.multiply(x0N, 1 + (h / 2) * pos[:, j])
                     x0NN = np.multiply(x0N, 1 - (h / 2) * pos[:, j])
-                    H[i, j] = \
-                        (self.func(x0PP) - self.func(x0PN) - self.func(x0NP) + self.func(x0NN)) / (h * pars[j])
+                    fPP = -self.func_vect(x0PP, self.data) / len(self.data)
+                    fPN = -self.func_vect(x0PN, self.data) / len(self.data)
+                    fNP = -self.func_vect(x0NP, self.data) / len(self.data)
+                    fNN = -self.func_vect(x0NN, self.data) / len(self.data)
+                    H[i, j] = (sum(fPP) - sum(fPN) - sum(fNP) + sum(fNN)) / (delta_i * h * estimates.x[j])
                     H[j, i] = H[i, j]
                 else:
                     x0PP = x0P + (h / 2) * pos[:, j]
                     x0PN = x0P - (h / 2) * pos[:, j]
                     x0NP = x0N + (h / 2) * pos[:, j]
                     x0NN = x0N - (h / 2) * pos[:, j]
-                    H[i, j] = (self.func(x0PP) - self.func(x0PN) - self.func(x0NP) + self.func(x0NN)) / h
+                    fPP = -self.func_vect(x0PP, self.data) / len(self.data)
+                    fPN = -self.func_vect(x0PN, self.data) / len(self.data)
+                    fNP = -self.func_vect(x0NP, self.data) / len(self.data)
+                    fNN = -self.func_vect(x0NN, self.data) / len(self.data)
+                    H[i, j] = (sum(fPP) - sum(fPN) - sum(fNP) + sum(fNN)) / (h * delta_i)
                     H[j, i] = H[i, j]
 
         self.hessian = H
@@ -117,15 +138,25 @@ class MaxLik(object):
         rows = self.data.shape[0]
 
         if not method:
-            varcov_matrix: np.array = -np.linalg.inv(hessian * rows)
+            varcov_matrix: np.array = np.linalg.inv(hessian)
 
         elif method == 'outer':
-            varcov_matrix = np.linalg.inv(np.outer(gradient, gradient))
+            varcov_matrix: np.array = np.linalg.inv(
+                np.dot(
+                    np.transpose(gradient),
+                    gradient
+                )
+            )
 
         elif 'sandwich':
+            outer: np.array = np.dot(np.transpose(gradient), gradient)
             varcov_matrix = np.dot(
-                np.dot(-np.linalg.inv(hessian * rows),
-                       np.outer(gradient, gradient)),
+                np.dot(
+                    np.linalg.inv(
+                        hessian * rows
+                    ),
+                    outer
+                ),
                 np.linalg.inv(hessian * rows)
             )
 
@@ -138,51 +169,77 @@ class MaxLik(object):
         self.varcov_matrix = varcov_matrix
         return varcov_matrix
 
-    def _calc_pars_standard_errors(self):
+    def _calc_pars_standard_errors(self) -> np.array:
 
-        varcov_matrix: np.array = self._calc_matrix_variance_covariance()
+        if self.varcov_matrix is None:
+            self.varcov_matrix: np.array = self._calc_matrix_variance_covariance()
 
-        self.pars_standard_errors: np.array = np.diag(varcov_matrix) ** (1 / 2)
+        self.pars_standard_errors: np.array = np.diag(self.varcov_matrix) ** 0.5
         return self.pars_standard_errors
 
     def _calc_z_test(self) -> np.array:
 
-        self.__optimizator_boss()
+        if not np.all(self.pars_optimized):
+            self.__optimizator_boss()
 
-        pars = self.pars_optimized
-        se = self._calc_pars_standard_errors()
-
-        return pars / se
+        return self.pars_optimized / self._calc_pars_standard_errors()
 
     def _calc_pvalue_test(self):
-        z_test: np.array = self._calc_z_test()
-        pvalues: np.array = 2 * (1 - norm.cdf(abs(z_test)))
+        return 2 * (1 - norm.cdf(abs(self._calc_z_test())))
 
-        return pvalues
+    @staticmethod
+    def graphic_adjustment(summary: pd.DataFrame) -> pd.DataFrame:
+
+        summary_print: pd.DataFrame = summary.copy(deep=True)
+
+        # ************************** ROUND VALUES **********************************************************************
+        summary_print['beta value'] = summary['beta value'].round(2)
+        summary_print['SE'] = summary['SE'].round(3)
+        summary_print['Z-test'] = summary['Z-test'].round(3)
+        summary_print['p-value'] = summary['p-value'].round(3)
+
+        # ************************** Z-TEST AGAINST NORMAL *************************************************************
+        summary_print = summary_print.astype(str)
+        summary_print['conf'] = np.nan
+
+        for beta in summary.index:
+            z = summary.loc[beta, 'Z-test']
+            if abs(z) > norm.ppf(0.9):
+                summary_print.loc[beta, 'conf'] = ' *'
+            elif abs(z) > norm.ppf(0.95):
+                summary_print.loc[beta, 'conf'] = '**'
+            elif abs(z) > norm.ppf(0.99):
+                summary_print.loc[beta, 'conf'] = '***'
+            else:
+                summary_print.loc[beta, 'conf'] = ' '
+
+        return summary_print.loc[:, ['beta value', 'SE', 'Z-test', 'conf', 'p-value']]
 
     def get_summary(self):
+
+        start = perf_counter()
 
         if not self.vfunc:
             self.__optimizator_boss()
 
-        se: np.array = self._calc_pars_standard_errors()
-        ztest: np.array = self._calc_z_test()
-        pvalue: np.array = self._calc_pvalue_test()
-
-        rows_name: list = [f'beta{par}' for par in self.pars_optimized]
+        rows_name: list = [f'beta{kd}' for kd in range(len(self.pars_optimized))]
         summary: pd.DataFrame = pd.DataFrame(
             columns=['beta value', 'SE', 'Z-test', 'p-value'],
             index=rows_name
         )
 
         summary['beta value'] = self.pars_optimized
-        summary['SE'] = se
-        summary['Z-test'] = ztest
-        summary['p-value'] = pvalue
+        summary['SE'] = self._calc_pars_standard_errors()
+        summary['Z-test'] = self._calc_z_test()
+        summary['p-value'] = self._calc_pvalue_test()
+
+        summary_print: pd.DataFrame = self.graphic_adjustment(summary=summary)
 
         print('======================================================================================================')
         print('======================== MAX LIK OPTIMIZER - by Prof.Carlini et Al. ==================================')
         print('======================================================================================================')
+
+        print(f'\nelapsed time: {round(perf_counter() - start, 6)}')
 
         print(f'\nnumber of observation: {len(self.data)}')
         print(f'number of parameters: {len(self.pars_optimized)}')
@@ -190,28 +247,58 @@ class MaxLik(object):
         print(f'\nvariance-covariance method: {self.method_se_optimization}')
 
         print('\n=====================================================================================================')
-        print('\n', summary)
-        print('\n ================================= ENJOY ECONOMETRICS GUYS ==========================================')
+        print('\n', summary_print)
+        print('\n * alpha = 0.1')
+        print(' ** alpha = 0.05')
+        print(' *** alpha = 0.01')
+        print('\n================================= ENJOY ECONOMETRICS GUYS ===========================================')
 
         return summary
 
 if __name__ == "__main__":
     import numpy as np
     from statsmodels.tsa.arima_process import ArmaProcess
+    from time import perf_counter
 
     np.random.seed(12345)
     ar2 = np.array([1, 0.5])
     ma = np.array([1])
-    N = 100
+    N = 20_000
     sim = ArmaProcess(ar2, ma).generate_sample(nsample=N)
 
-    def negloglikeAR(xi):
-        S = np.sum((sim[1:N - 1] - xi[0] * np.ones(N - 2) - xi[1] * sim[0:N - 2]) ** 2)
-        return N / 2 * np.log(2 * np.pi * xi[2]) + S / (2 * xi[2])
+    def logLikeAR_1(parameters, data):
+        c = parameters[0]
+        phi = parameters[1]
+        sigma_2 = parameters[2]
+        Lik = np.zeros(len(data))
+        Lik[0] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2 / (1 - phi ** 2)) - ((1 - phi ** 2) / 2 * sigma_2) * (
+                    data[0] - c / (1 - phi)) ** 2
+        for i in range(1, len(data)):
+            Lik[i] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2) - 0.5 * (
+                        data[i] - c - phi * data[i - 1]) ** 2 / sigma_2
+        return Lik
 
-    x0 = np.array([0.5, 1, 1])
-    bounds = [[-10, 10], [-10, 10], [0.001, 10]]
+    def avg_logLikeAR_1(parameters, data):
+        c = parameters[0]
+        phi = parameters[1]
+        sigma_2 = parameters[2]
+        Lik = np.zeros(len(data))
+        Lik[0] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2 / (1 - phi ** 2)) - ((1 - phi ** 2) / 2 * sigma_2) * (
+                    data[0] - c / (1 - phi)) ** 2
+        for i in range(1, len(data)):
+            Lik[i] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2) - 0.5 * (
+                        data[i] - c - phi * data[i - 1]) ** 2 / sigma_2
+        return -sum(Lik) / len(sim)
 
-    boss = MaxLik(func=negloglikeAR, data=sim, initial_guess=x0, bound=bounds, method_se_optimization='sandwich')
-    boss.get_summary()
+    x0 = np.array([1, 0.4, 1])
+    bounds = [[-10, 10], [-0.999, 0.999], [0.001, 10]]
 
+    boss = MaxLik(
+        func_vector=logLikeAR_1,
+        func_avg=avg_logLikeAR_1,
+        data=sim,
+        initial_guess=x0,
+        bounds=bounds,
+        method_se_optimization='outer'
+    )
+    summary = boss.get_summary()
