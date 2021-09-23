@@ -239,7 +239,7 @@ class MaxLik(object):
         print('======================== MAX LIK OPTIMIZER - by Prof.Carlini et Al. ==================================')
         print('======================================================================================================')
 
-        print(f'\nelapsed time: {round(perf_counter() - start, 6)}')
+        print(f'\nelapsed time: {round(perf_counter() - start, 6)}s')
 
         print(f'\nnumber of observation: {len(self.data)}')
         print(f'number of parameters: {len(self.pars_optimized)}')
