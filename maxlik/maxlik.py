@@ -15,7 +15,7 @@ class MaxLik(object):
                  initial_guess: np.array,
                  bounds: List[list],
                  delta_incremental: float = 0.00001,
-                 method_se_optimization: str = None  # default: hessian_inv * inv(eye(hessian_inv.shape[0])
+                 method_se_optimization: str = None  # default: information
                  ):
 
         self.__check_num_pars(pars=initial_guess, data=data)
@@ -77,7 +77,7 @@ class MaxLik(object):
                         (1 + h * pos[:, i]),
                         self.data
                     )
-                ) - self.func_vect(pars, self.data)) / pars[i] * h
+                ) - self.func_vect(pars, self.data)) / (pars[i] * h)
             else:
                 gradient[:, i] = (self.func_vect(pars + h * pos[:, i], self.data) - self.func_vect(pars, self.data)) / h
 

@@ -7,7 +7,7 @@ from maxlik.likelihood import logLikeAR_1
 np.random.seed(12345)
 ar2 = np.array([1, 0.5])
 ma = np.array([1])
-N = 20_000
+N = 10_000
 data = ArmaProcess(ar2, ma).generate_sample(nsample=N)
 x0 = np.array([1, 0.4, 1])
 
