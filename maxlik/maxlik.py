@@ -220,7 +220,7 @@ class MaxLik(object):
 
         return summary_print.loc[:, ['beta value', 'SE', 'Z-test', 'conf', 'p-value']]
 
-    def get_summary(self):
+    def get_summary(self, print: bool = True):
 
         start = perf_counter()
 
@@ -238,24 +238,25 @@ class MaxLik(object):
         summary['Z-test'] = self._calc_z_test()
         summary['p-value'] = self._calc_pvalue_test()
 
-        summary_print: pd.DataFrame = self.graphic_adjustment(summary=summary)
+        if print:
+            summary_print: pd.DataFrame = self.graphic_adjustment(summary=summary)
 
-        print('======================================================================================================')
-        print('======================== MAX LIK OPTIMIZER - by Prof.Carlini et Al. ==================================')
-        print('======================================================================================================')
+            print('===================================================================================================')
+            print('======================== MAX LIK OPTIMIZER - by Prof.Carlini et Al. ===============================')
+            print('===================================================================================================')
 
-        print(f'\nelapsed time: {round(perf_counter() - start, 6)}s')
+            print(f'\nelapsed time: {round(perf_counter() - start, 6)}s')
 
-        print(f'\nnumber of observation: {len(self.data)}')
-        print(f'number of parameters: {len(self.pars_optimized)}')
-        print(f'function value: {self.vfunc}')
-        print(f'\nvariance-covariance method: {self.method_se_optimization}')
+            print(f'\nnumber of observation: {len(self.data)}')
+            print(f'number of parameters: {len(self.pars_optimized)}')
+            print(f'function value: {self.vfunc}')
+            print(f'\nvariance-covariance method: {self.method_se_optimization}')
 
-        print('\n=====================================================================================================')
-        print('\n', summary_print)
-        print('\n * alpha = 0.1')
-        print(' ** alpha = 0.05')
-        print(' *** alpha = 0.01')
-        print('\n================================= ENJOY ECONOMETRICS GUYS ===========================================')
+            print('\n=================================================================================================')
+            print('\n', summary_print)
+            print('\n * alpha = 0.1')
+            print(' ** alpha = 0.05')
+            print(' *** alpha = 0.01')
+            print('\n================================= ENJOY ECONOMETRICS GUYS =======================================')
 
         return summary
