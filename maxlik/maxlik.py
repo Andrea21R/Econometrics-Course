@@ -70,14 +70,14 @@ class MaxLik(object):
         gradient: np.array = np.zeros([len(self.data), len(pars)])
 
         for i in range(len(pars)):
-            if pars[i] > 1:
+            if pars[i] > 100:
                 gradient[:, i] = (self.func_vect(
                     np.multiply(
                         pars,
-                        (1 + h * pos[:, i]),
-                        self.data
+                        (1 + h * pos[:, i])),
+                    self.data
                     )
-                ) - self.func_vect(pars, self.data)) / (pars[i] * h)
+                 - self.func_vect(pars, self.data)) / (pars[i] * h)
             else:
                 gradient[:, i] = (self.func_vect(pars + h * pos[:, i], self.data) - self.func_vect(pars, self.data)) / h
 
@@ -96,7 +96,7 @@ class MaxLik(object):
         H = np.zeros((len(pars), len(pars)))
 
         for i in range(len(pars)):
-            if pars[i] > 1:
+            if pars[i] > 100:
                 x0P = np.multiply(pars, 1 + (h / 2) * pos[:, i])
                 x0N = np.multiply(pars, 1 - (h / 2) * pos[:, i])
                 delta_i = pars[i] * h
@@ -107,7 +107,7 @@ class MaxLik(object):
 
             for j in (0, i):
 
-                if pars[j] > 1:
+                if pars[j] > 100:
                     x0PP = np.multiply(x0P, 1 + (h / 2) * pos[:, j])
                     x0PN = np.multiply(x0P, 1 - (h / 2) * pos[:, j])
                     x0NP = np.multiply(x0N, 1 + (h / 2) * pos[:, j])
@@ -208,12 +208,13 @@ class MaxLik(object):
 
         for beta in summary.index:
             z = summary.loc[beta, 'Z-test']
-            if abs(z) > norm.ppf(0.9):
-                summary_print.loc[beta, 'conf'] = ' *'
+
+            if abs(z) > norm.ppf(0.99):
+                summary_print.loc[beta, 'conf'] = '***'
             elif abs(z) > norm.ppf(0.95):
                 summary_print.loc[beta, 'conf'] = '**'
-            elif abs(z) > norm.ppf(0.99):
-                summary_print.loc[beta, 'conf'] = '***'
+            elif abs(z) > norm.ppf(0.9):
+                summary_print.loc[beta, 'conf'] = ' *'
             else:
                 summary_print.loc[beta, 'conf'] = ' '
 
