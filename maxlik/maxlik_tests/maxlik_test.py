@@ -7,7 +7,7 @@ from maxlik.likelihood import logLikeAR_1
 np.random.seed(12345)
 ar2 = np.array([1, 0.5])
 ma = np.array([1])
-N = 10_000
+N = 1_000
 data = ArmaProcess(ar2, ma).generate_sample(nsample=N)
 x0 = np.array([1, 0.4, 1])
 
@@ -21,4 +21,4 @@ boss = MaxLik(
     bounds=bounds,
     method_se_optimization='outer'
 )
-summary = boss.get_summary()
+summary = boss.get_summary(print=True)  # if you set print=False you'll only save df into variable, no printing.
