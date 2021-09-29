@@ -1,0 +1,8 @@
+import os
+import sys
+sys.path.insert(0, os.path.abspath('Desktop\Econometrics-Course\maxlik'))
+
+# to show system's paths
+# sys.path
+
+from maxlik import MaxLik
