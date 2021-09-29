@@ -220,7 +220,7 @@ class MaxLik(object):
 
         return summary_print.loc[:, ['beta value', 'SE', 'Z-test', 'conf', 'p-value']]
 
-    def get_summary(self, print: bool = True):
+    def get_summary(self, printing: bool = True):
 
         start = perf_counter()
 
@@ -238,7 +238,7 @@ class MaxLik(object):
         summary['Z-test'] = self._calc_z_test()
         summary['p-value'] = self._calc_pvalue_test()
 
-        if print:
+        if printing:
             summary_print: pd.DataFrame = self.graphic_adjustment(summary=summary)
 
             print('===================================================================================================')
