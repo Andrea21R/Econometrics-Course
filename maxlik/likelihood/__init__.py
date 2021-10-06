@@ -1,1 +1,2 @@
-from maxlik.likelihood.likelihood import logLikeAR_1
+from maxlik.likelihood.likelihood import ar1_loglike
+from maxlik.likelihood.likelihood import garch_loglik
