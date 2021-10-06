@@ -10,10 +10,11 @@ from scipy.stats import norm
 class MaxLik(object):
 
     def __init__(self,
-                 func_vector,
+                 func_vector: 'custom log-likelihood function',
                  data: np.array,
                  initial_guess: np.array,
                  bounds: List[list],
+                 constraints: dict = None,
                  delta_incremental: float = 0.00001,
                  method_se_optimization: str = None  # default: information
                  ):
@@ -26,6 +27,7 @@ class MaxLik(object):
         self.data: np.array = data
         self.initial_guess: np.array = initial_guess
         self.bounds: tuple = tuple(tuple(i) for i in bounds)
+        self.constraints: dict = constraints
         self.delta_incremental: float = delta_incremental
         self.method_se_optimization: str = method_se_optimization
 
@@ -53,6 +55,7 @@ class MaxLik(object):
             fun=self.func_avg,
             x0=self.initial_guess,
             bounds=self.bounds,
+            constraints=self.constraints,
             args=self.data
         )
         self.vfunc = res.fun
@@ -245,7 +248,8 @@ class MaxLik(object):
             print('======================== MAX LIK OPTIMIZER - by Prof.Carlini et Al. ===============================')
             print('===================================================================================================')
 
-            print(f'\nelapsed time: {round(perf_counter() - start, 6)}s')
+            print(f'\nfunction minimized: {self.func_vect.__name__}')
+            print(f'elapsed time: {round(perf_counter() - start, 6)}s')
 
             print(f'\nnumber of observation: {len(self.data)}')
             print(f'number of parameters: {len(self.pars_optimized)}')
