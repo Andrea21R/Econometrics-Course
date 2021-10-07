@@ -24,6 +24,7 @@ boss = MaxLik(
 )
 summary = boss.get_summary(printing=True)  # if you set printing=False you'll only save df into variable, no printing.
 
+# ========================================= GARCH(1) TEST ==============================================================
 data = np.array(pd.read_excel("~/Desktop/Econometrics-Course/maxlik/maxlik_tests/GARCH_simulation.xlsx"))
 bounds = [[-10, 10], [0.000009, 10], [0.000009, 10], [0.000009, 10]]
 cons = ({'type': 'ineq', 'fun': lambda x: x[0] - 2 * x[1] + 2})
