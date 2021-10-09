@@ -27,7 +27,7 @@ summary = boss.get_summary(printing=True)  # if you set printing=False you'll on
 # ========================================= GARCH(1) TEST ==============================================================
 data = np.array(pd.read_excel("~/Desktop/Econometrics-Course/maxlik/maxlik_tests/GARCH_simulation.xlsx"))
 bounds = [[-10, 10], [0.000009, 10], [0.000009, 10], [0.000009, 10]]
-cons = ({'type': 'ineq', 'fun': lambda x: x[0] - 2 * x[1] + 2})
+cons = ({'type': 'ineq', 'fun': lambda p: -(p[2] + p[3]) + 1})
 x0 = np.array([1, 0.4, 1, 1])
 
 boss = MaxLik(
