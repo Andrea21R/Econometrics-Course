@@ -9,7 +9,9 @@ from time import perf_counter
 
 
 class GMM(object):
-
+    """
+    This is a fantastic class modestly
+    """
     def __init__(self,
                  data: np.array,
                  func_h: 'custom function',
@@ -203,7 +205,8 @@ if __name__ == "__main__":
 
     # ================= RANDOM SAMPLE BY T-DISTRIBUTION ================================================================
     np.random.seed(100)
-    data = t.rvs(11, size=1000)
+    data = t.rvs(11, size=1_000)
+    # data = np.random.normal(1, 1, 1000)
 
     # ================= DEFINE FUNCTION ================================================================================
 
@@ -230,7 +233,7 @@ if __name__ == "__main__":
         initial_guess=np.array([4.5]),
         GMM_lags=0,
         bounds=[[4.00001, None]],
-        max_iter=10_000,
+        max_iter=2,
         tolerance_optmz1=0.00000000000001,
         tolerance_optmz2=0.00000000000001,
         constraints=None  # we don't have any constraints for this case
