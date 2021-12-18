@@ -10,12 +10,14 @@ from time import perf_counter
 
 class GMM(object):
     """
-    This is a fantastic class modestly
+    WARNING.1: func_vector input (che è una funzione) deve avere come input due parametri che DEVONO ESSERE
+               NECESSARIAMENTE CHIAMATI: pars_vect, data
+    WARNING.2: func_vector, parameter "pars_vect" DEVE NECESSARIAMENTE ESSERE UN NUMPY.ARRAY 1D (ex. shape(n,))
     """
     def __init__(self,
                  data: np.array,
                  func_h: 'custom function',
-                 func_g_hat: 'custom function',
+                 num_conditions: int,
                  initial_guess: np.array,
                  GMM_lags: int,
                  bounds: List[list] = None,
@@ -25,16 +27,17 @@ class GMM(object):
                  constraints: dict = None
                  ):
         # ================================ USER INPUT ==================================================================
-        self.data: np.array = data
+        self.k = num_conditions
         self.initial_guess: np.array = initial_guess
+        self.__check_missspecification()
+        self.data: np.array = data
         self.func_h = func_h
-        self.func_g_hat = func_g_hat
+        self.__check_func_h_pars()
         self.GMM_lags: int = GMM_lags
         self.bounds: List[list] = bounds
         self.max_iter: int = max_iter
         self.tolerance_optmz1 = tolerance_optmz1
         self.tolerance_optmz2 = tolerance_optmz2
-        self.k: int = max(func_g_hat(pars_vect=initial_guess, data=data).shape)
         self.constraints: dict = constraints
 
         # ================================ CLASS OUTPUT ================================================================
@@ -42,23 +45,35 @@ class GMM(object):
         self.pars_optimized = None
         self.omega = None
 
-    def __manage_g_hat_shape(self, g_hat: np.array):
-        # shape check (result_g_hat must be a 1D vector)
-        if g_hat.shape != (self.k,):
-            g_hat = g_hat.reshape(self.k, )
-        return g_hat
+    def __check_func_h_pars(self):
+        user_pars = self.func_h.__code__.co_varnames[:2]
+        if len(user_pars) != 2:
+            raise Exception("Your function must have exactly 2 parameters called 'pars_vect' and 'data'")
+        if len({"pars_vect", "data"}.difference(user_pars)) != 0:
+            raise Exception("Your function's parameters name must be 'pars_vect' and 'data'")
+
+    def __check_missspecification(self):
+        if self.k < max(self.initial_guess.shape):
+            raise Exception("You've inserted a number of conditions less than the number of parameters to estimate. "
+                            "You cannot estimate model parameter")
+
+    def __calc_g_hat(self, pars_vect: np.array):
+        """
+        Quello che ritorna da func_h() può avere sulle righe la numerosità campionaria e sulle colonne le condizioni,
+        oppure l'opposto. In entrambi i casi _calc_g_hat() fixa la cosa.
+        """
+        tmp_arr: np.array = self.func_h(pars_vect=pars_vect, data=self.data)
+        # check if moment conditions are on the columns
+        tmp_arr = tmp_arr if tmp_arr.shape[0] > tmp_arr.shape[1] else tmp_arr.transpose()
+        return np.mean(tmp_arr, axis=0)  # shape: (num_conditions, ); vector 1D
 
     def _obj_func(self, pars_vect: np.array, omega: np.array):
 
-        g_hat: np.array = self.func_g_hat(pars_vect=pars_vect, data=self.data)
-        # shape check (result_g_hat must be a 1D vector)
-        if g_hat.shape != (self.k,):
-            g_hat = g_hat.reshape(self.k,)
-
+        g_hat: np.array = self.__calc_g_hat(pars_vect=pars_vect)  # return 1D vector
         inv_omega = np.linalg.inv(omega)
 
-        # givend the 1D dimension of g_hat, the transpose is not necessary
-        return g_hat @ inv_omega @ g_hat.transpose()
+        # given the 1D dimension of g_hat, the transpose is not necessary
+        return g_hat @ inv_omega @ g_hat
 
     def _calc_gradient(self):
 
@@ -68,17 +83,17 @@ class GMM(object):
         h = 0.00001
         n = max(self.initial_guess.shape)
         pos = np.identity(n)
+        # il gradiente avrà k righe (condizioni) e n colonne (parametri)
         grad = np.zeros((self.k, n))
 
-        func_g_hat = self.func_g_hat
-        data = self.data
         beta = self.pars_optimized
 
         for i in range(n):
-            x: np.array = func_g_hat(np.multiply(beta, (1 + h * pos[:, i])), data)
-            xx: np.array = func_g_hat(beta, data)
+            x: np.array = self.__calc_g_hat(np.multiply(beta, (1 + h * pos[:, i])))
+            xx: np.array = self.__calc_g_hat(beta)
 
-            grad[:, i] = ((x - xx) / (beta[i] * h))[:, i]
+            # grad sarà una matrice diagonale con
+            grad[:, i] = ((x - xx) / (beta[i] * h))
 
         return grad
 
@@ -88,7 +103,6 @@ class GMM(object):
         t: int = len(self.data)
         init_func: int = 10_000
         x0 = self.initial_guess
-
         omega: np.array = np.identity(self.k)
 
         count = 0
@@ -192,6 +206,8 @@ class GMM(object):
             print(f'Test of over-identification of restrictions: {round(stat_test, 6)}')
             print(f'P-Value of over-identification: {str(round(p_test, 4) * 100)}%')
 
+            print("\nPer problemi, si prega di contattare Kevyn Stefanelli +39 320 647 5439")
+
             print('\n=================================================================================================')
             print(f'\n{summary}')
             print('\n================================= ENJOY ECONOMETRICS GUYS =======================================')
@@ -205,16 +221,21 @@ if __name__ == "__main__":
 
     # ================= RANDOM SAMPLE BY T-DISTRIBUTION ================================================================
     np.random.seed(100)
-    data = t.rvs(11, size=1_000)
+    data = t.rvs(11, size=5_000_000)
     # data = np.random.normal(1, 1, 1000)
 
     # ================= DEFINE FUNCTION ================================================================================
 
     def func_moment_cond(pars_vect: np.array, data: np.array):
+        """
+        Norme buona scrittura:
+         i) h: rappresentano un vettore che contengono l'n-esima condizione applicata ai dati input (i.e. data)
+        ii) moment_conditions: è una matrice che ha su una dimensione la lunghezza campionaria e sull'altra il numero
+        di condizioni applicate (ex. matrice(100x10) significa 100 dati campionari e 10 condizioni applicate)
+        """
         h_1 = data ** 2 - pars_vect / (pars_vect - 2)
         h_2 = data ** 4 - (3 * pars_vect ** 2) / ((pars_vect - 2) * (pars_vect - 4))
-        moment_conditions = np.vstack((h_1, h_2))
-        moment_conditions = moment_conditions.transpose()
+        moment_conditions = np.vstack((h_1, h_2)).transpose()
         return moment_conditions
 
 
@@ -229,7 +250,7 @@ if __name__ == "__main__":
     GMM = GMM(
         data=data,
         func_h=func_moment_cond,
-        func_g_hat=func_g_hat,
+        num_conditions=2,
         initial_guess=np.array([4.5]),
         GMM_lags=0,
         bounds=[[4.00001, None]],
