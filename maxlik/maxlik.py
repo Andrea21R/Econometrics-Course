@@ -8,6 +8,11 @@ from scipy.stats import norm
 
 
 class MaxLik(object):
+    """
+    WARNING.1: func_vector input (che è una funzione) deve avere come input due parametri che DEVONO ESSERE
+               NECESSARIAMENTE CHIAMATI: pars_vect, data
+    WARNING.2: func_vector, parameter "pars_vect" DEVE NECESSARIAMENTE ESSERE UN NUMPY.ARRAY 1D (ex. shape(n,))
+    """
 
     def __init__(self,
                  func_vector: 'custom log-likelihood function',
@@ -16,13 +21,14 @@ class MaxLik(object):
                  bounds: List[list],
                  constraints: dict = None,
                  delta_incremental: float = 0.00001,
-                 method_se_optimization: str = None  # default: information
+                 method_se_optimization: str = "sandwich"
                  ):
 
         self.__check_num_pars(pars=initial_guess, data=data)
 
         # from input
         self.func_vect = func_vector
+        self.__check_func_vect_pars()
         self.func_avg = self.__avg_func
         self.data: np.array = data
         self.initial_guess: np.array = initial_guess
@@ -39,9 +45,16 @@ class MaxLik(object):
         self.hessian = None
         self.gradient = None
 
+    def __check_func_vect_pars(self):
+        user_pars = self.func_vect.__code__.co_varnames[:2]
+        if len(user_pars) != 2:
+            raise Exception("Your function must have exactly 2 parameters called 'pars_vect' and 'data'")
+        if len({"pars_vect", "data"}.difference(user_pars)) != 0:
+            raise Exception("Your function's parameters name must be 'pars_vect' and 'data'")
+
     def __avg_func(self, parameters, data):
 
-        ll = self.func_vect(parameters, data)
+        ll = self.func_vect(pars_vect=parameters, data=data)
         return -sum(ll) / len(ll)
 
     @staticmethod
@@ -74,15 +87,15 @@ class MaxLik(object):
 
         for i in range(len(pars)):
             if pars[i] > 100:
-                gradient[:, i] = (self.func_vect(
-                    np.multiply(
-                        pars,
-                        (1 + h * pos[:, i])),
-                    self.data
-                    )
-                 - self.func_vect(pars, self.data)) / (pars[i] * h)
+                res = (self.func_vect(pars_vect=np.multiply(pars, (1 + h * pos[:, i])), data=self.data)
+                       - self.func_vect(pars_vect=pars, data=self.data)) \
+                      / (pars[i] * h)
             else:
-                gradient[:, i] = (self.func_vect(pars + h * pos[:, i], self.data) - self.func_vect(pars, self.data)) / h
+                res = (self.func_vect(pars_vect=pars + h * pos[:, i], data=self.data) - self.func_vect(pars_vect=pars, data=self.data)) / h
+
+            # reshape res in 1D array to avoid error during insertion into gradient
+            res = res.reshape(max(res.shape), )
+            gradient[:, i] = res
 
         self.gradient = gradient
         return gradient
@@ -115,10 +128,10 @@ class MaxLik(object):
                     x0PN = np.multiply(x0P, 1 - (h / 2) * pos[:, j])
                     x0NP = np.multiply(x0N, 1 + (h / 2) * pos[:, j])
                     x0NN = np.multiply(x0N, 1 - (h / 2) * pos[:, j])
-                    fPP = -self.func_vect(x0PP, self.data) / len(self.data)
-                    fPN = -self.func_vect(x0PN, self.data) / len(self.data)
-                    fNP = -self.func_vect(x0NP, self.data) / len(self.data)
-                    fNN = -self.func_vect(x0NN, self.data) / len(self.data)
+                    fPP = -self.func_vect(pars_vect=x0PP, data=self.data) / len(self.data)
+                    fPN = -self.func_vect(pars_vect=x0PN, data=self.data) / len(self.data)
+                    fNP = -self.func_vect(pars_vect=x0NP, data=self.data) / len(self.data)
+                    fNN = -self.func_vect(pars_vect=x0NN, data=self.data) / len(self.data)
                     H[i, j] = (sum(fPP) - sum(fPN) - sum(fNP) + sum(fNN)) / (delta_i * h * estimates.x[j])
                     H[j, i] = H[i, j]
                 else:
@@ -126,10 +139,10 @@ class MaxLik(object):
                     x0PN = x0P - (h / 2) * pos[:, j]
                     x0NP = x0N + (h / 2) * pos[:, j]
                     x0NN = x0N - (h / 2) * pos[:, j]
-                    fPP = -self.func_vect(x0PP, self.data) / len(self.data)
-                    fPN = -self.func_vect(x0PN, self.data) / len(self.data)
-                    fNP = -self.func_vect(x0NP, self.data) / len(self.data)
-                    fNN = -self.func_vect(x0NN, self.data) / len(self.data)
+                    fPP = -self.func_vect(pars_vect=x0PP, data=self.data) / len(self.data)
+                    fPN = -self.func_vect(pars_vect=x0PN, data=self.data) / len(self.data)
+                    fNP = -self.func_vect(pars_vect=x0NP, data=self.data) / len(self.data)
+                    fNN = -self.func_vect(pars_vect=x0NN, data=self.data) / len(self.data)
                     H[i, j] = (sum(fPP) - sum(fPN) - sum(fNP) + sum(fNN)) / (h * delta_i)
                     H[j, i] = H[i, j]
 
@@ -140,7 +153,8 @@ class MaxLik(object):
 
         gradient: np.array = self._calc_gradient() if self.gradient is None else self.gradient
         hessian: np.array = self._calc_hessian() if self.hessian is None else self.hessian
-        method: str = self.method_se_optimization.lower()
+        method: str = self.method_se_optimization.lower() if self.method_se_optimization != None \
+            else self.method_se_optimization
 
         rows = self.data.shape[0]
 
@@ -200,7 +214,7 @@ class MaxLik(object):
         summary_print: pd.DataFrame = summary.copy(deep=True)
 
         # ************************** ROUND VALUES **********************************************************************
-        summary_print['beta value'] = summary['beta value'].round(2)
+        summary_print['beta value'] = summary['beta value'].round(4)
         summary_print['SE'] = summary['SE'].round(3)
         summary_print['Z-test'] = summary['Z-test'].round(3)
         summary_print['p-value'] = summary['p-value'].round(3)
