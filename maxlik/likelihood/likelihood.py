@@ -3,11 +3,11 @@ from statsmodels.tsa.arima_process import ArmaProcess
 from scipy.optimize import minimize
 
 
-def ar1_loglike(parameters, data):
+def ar1_loglike(pars_vect: np.array, data: np.array):
 
-    c = parameters[0]
-    phi = parameters[1]
-    sigma_2 = parameters[2]
+    c = pars_vect[0]
+    phi = pars_vect[1]
+    sigma_2 = pars_vect[2]
     lik = np.zeros(len(data))
     lik[0] = -0.5 * np.log(2 * np.pi) - 0.5 * np.log(sigma_2 / (1 - phi ** 2)) - ((1 - phi ** 2) / 2 * sigma_2) * (
                 data[0] - c / (1 - phi)) ** 2
@@ -17,12 +17,12 @@ def ar1_loglike(parameters, data):
     return lik
 
 
-def garch_loglik(parameters, data):
+def garch_loglik(pars_vect: np.array, data: np.array):
 
-    mu = parameters[0]
-    omega = parameters[1]
-    alpha = parameters[2]
-    beta = parameters[3]
+    mu = pars_vect[0]
+    omega = pars_vect[1]
+    alpha = pars_vect[2]
+    beta = pars_vect[3]
 
     sig2 = np.zeros(len(data))
     sig2[0] = (data[0] - mu) ** 2

@@ -1,0 +1,10 @@
+# INSERT MAXLIK IN YOUR SYS PATH AND IMPORT IT
+
+import os
+import sys
+from pathlib import Path
+
+root = str(Path('~').expanduser())  # get your root path (C:\\Users\your_name)
+maxlik_path = "\PycharmProjects\Econometrics-Course\maxlik"
+sys.path.insert(0, root + maxlik_path)  # add MaxLik path in your system (sys) path list
+from maxlik import MaxLik  # now you can import MaxLik class
