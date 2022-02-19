@@ -1,4 +1,4 @@
-from typing import List
+from typing import List, Callable
 import numpy as np
 import pandas as pd
 from time import perf_counter
@@ -15,7 +15,7 @@ class MaxLik(object):
     """
 
     def __init__(self,
-                 func_vector: 'custom log-likelihood function',
+                 func_vector: Callable[[np.array, np.array], np.array],
                  data: np.array,
                  initial_guess: np.array,
                  bounds: List[list],
