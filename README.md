@@ -1,5 +1,5 @@
 # Econometrics-Course
-Econometrics library for University Master's degree course
+Econometrics library for University Master's degree course at LUISS Guido Carli, Rome, Italy.
 
 
 realized by:
